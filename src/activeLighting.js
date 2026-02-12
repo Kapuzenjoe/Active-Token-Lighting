@@ -170,6 +170,7 @@ class ATL {
             if (game.userId !== userId || !item.parent) return;
             if ((game.system.id === "dnd5e" && (hasProperty(change, "system.equipped") || hasProperty(change, "system.attunement")))
                 || (game.system.id === "wfrp4e" && hasProperty(change, "system.worn.value"))
+                || (game.system.id === "dragonbane" && hasProperty(change, "system.worn"))
                 || (game.system.id === "swade" && hasProperty(change, "system.equipStatus"))) {
                 let actor = item.parent
                 let ATLeffects = getEffects(actor)
