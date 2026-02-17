@@ -1,7 +1,7 @@
 import { PresetConfig } from "./preset-config.js";
 import { ATLUpdate } from "./updateManager.js";
 
-const { deepClone, duplicate, flattenObject, getProperty, hasProperty, mergeObject, setProperty } = foundry.utils;
+const { deepClone, duplicate, flattenObject, getProperty, hasProperty, mergeObject, setProperty, getType } = foundry.utils;
 
 class ATL {
 

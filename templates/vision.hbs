@@ -32,7 +32,7 @@
         </div>
     </fieldset>
 
-    {{!-- <fieldset>
+     <fieldset>
         <legend>{{localize "TOKEN.SightHeaderDetection"}}</legend>
         <header class="detection-mode">
             <div class="id">{{localize "TOKEN.DetectionMode"}}</div>
@@ -63,7 +63,7 @@
         </fieldset>
         {{/each}}
 
-        {{#each sourceDetectionModes as |mode i|}}
+        {{!-- {{#each sourceDetectionModes as |mode i|}}
         <fieldset class="detection-mode" data-index="{{i}}">
             <div class="id">
                 <select name="detectionModes.{{i}}.id">
@@ -83,9 +83,9 @@
                     data-tooltip aria-label="{{localize " TOKEN.DetectionRemove"}}"></button>
             </div>
         </fieldset>
-        {{/each}}
+        {{/each}}  --}}
     </fieldset>
- --}}
+
 {{!--     <fieldset>
         <legend>{{localize "TOKEN.SightHeaderAdvanced"}}</legend>
         {{formGroup sightFields.color value=source.sight.color rootId=rootId}}

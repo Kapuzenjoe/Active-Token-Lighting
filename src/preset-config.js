@@ -1,9 +1,9 @@
-const { HandlebarsApplicationMixin, Application, DocumentSheetV2 } = foundry.applications.api;
+const { HandlebarsApplicationMixin, ApplicationV2, DocumentSheetV2, Base } = foundry.applications.api;
 /**
  * The Application used for defining a preset configuration that can be used by the `ATL.preset`
  * active effect key. It can handle updating an existing preset as well as creating a new one.
  */
-export class PresetConfig extends HandlebarsApplicationMixin(Application) {
+export class PresetConfig extends HandlebarsApplicationMixin(ApplicationV2) {
   /**
    * Create a new application to add/edit a preset.    
    * @param {ApplicationConfiguration} options Options used to configure the Application instance
@@ -44,6 +44,10 @@ export class PresetConfig extends HandlebarsApplicationMixin(Application) {
       handler: PresetConfig.#onSubmit,
       //submitOnChange: false,
       closeOnSubmit: true
+    },
+    actions: {
+      addDetectionMode: PresetConfig.#onAddDetectionMode,
+      removeDetectionMode: PresetConfig.#onRemoveDetectionMode
     }
   }
 
@@ -67,9 +71,9 @@ export class PresetConfig extends HandlebarsApplicationMixin(Application) {
     light: {
       template: "modules/ATL/templates/light.hbs", scrollable: [""]
     },
-    resources: {
-      template: "modules/ATL/templates/resources.hbs", scrollable: [""]
-    },
+    //resources: {
+    //  template: "modules/ATL/templates/resources.hbs", scrollable: [""]
+    //},
     footer: {
       template: "templates/generic/form-footer.hbs",
     },
@@ -82,13 +86,27 @@ export class PresetConfig extends HandlebarsApplicationMixin(Application) {
         { id: "identity", icon: "fa-solid fa-memo-pad" },
         { id: "appearance", icon: "fa-solid fa-square-user" },
         { id: "vision", icon: "fa-solid fa-eye" },
-        { id: "light", icon: "fa-solid fa-lightbulb" },
-        { id: "resources", icon: "fa-solid fa-heart" }
+        { id: "light", icon: "fa-solid fa-lightbulb" }
+        //{ id: "resources", icon: "fa-solid fa-heart" }
       ],
       initial: "appearance",
       labelPrefix: "TOKEN.TABS"
     }
   };
+
+  /**
+ * Localized Token Display Modes
+ * @returns {Record<string, string>}
+ */
+  static get DISPLAY_MODES() {
+    PresetConfig.#DISPLAY_MODES ??= Object.entries(CONST.TOKEN_DISPLAY_MODES).reduce((modes, [key, value]) => {
+      modes[value] = game.i18n.localize(`TOKEN.DISPLAY_${key}`);
+      return modes;
+    }, {});
+    return PresetConfig.#DISPLAY_MODES;
+  }
+
+  static #DISPLAY_MODES;
 
   /**
    * Localized Token Dispositions
@@ -134,6 +152,13 @@ export class PresetConfig extends HandlebarsApplicationMixin(Application) {
   }
 
   static #TOKEN_SHAPES;
+  /* -------------------------------------------- */
+  /**
+ * Maintain a copy of the original to show a real-time preview of changes.
+ * @type {TokenDocument|PrototypeToken|null}
+ * @protected
+ */
+  _preview = null;
 
   /* -------------------------------------------- */
 
@@ -207,7 +232,10 @@ export class PresetConfig extends HandlebarsApplicationMixin(Application) {
       rootId: this.id,
       object: preset,
       gridUnits: game.i18n.localize("GridUnits"),
+      displayModes: PresetConfig.DISPLAY_MODES,
       visionModes: Object.values(CONFIG.Canvas.visionModes).filter((f) => f.tokenConfig),
+      detectionModes: Object.values(CONFIG.Canvas.detectionModes).filter(f => f.tokenConfig),
+      preparedDetectionModes: this.preset?.detectionModes,
       lightAnimations: Object.entries(CONFIG.Canvas.lightAnimations).reduce(
         (obj, e) => {
           obj[e[0]] = game.i18n.localize(e[1].label);
@@ -244,6 +272,21 @@ export class PresetConfig extends HandlebarsApplicationMixin(Application) {
 
   /* -------------------------------------------- */
 
+  /**
+   * Mimic changes to the Token document as if they were true document updates.
+   * @param {object} [changes]  The changes to preview.
+   * @returns {void}
+   * @protected
+   */
+  _previewChanges(changes) {
+    if (!changes || !this._preview) return;
+    const deletions = { "-=actorId": null, "-=actorLink": null };
+    const mergeOptions = { inplace: false, performDeletions: true };
+    this._preview.updateSource(mergeObject(changes, deletions, mergeOptions));
+  }
+
+  /* -------------------------------------------- */
+
   /** @inheritDoc */
   async _preparePartContext(partId, context, options) {
     context = await super._preparePartContext(partId, context, options);
@@ -269,6 +312,74 @@ export class PresetConfig extends HandlebarsApplicationMixin(Application) {
     else if (el.dataset.edit) this.fieldsChanged.push(el.dataset.edit);
     console.log(this.fieldsChanged)
   }
+
+
+  /* -------------------------------------------- */
+
+  /**
+   * Add a new detection mode to the Token preview.
+   * @this {PresetConfig}
+   * @type {ApplicationClickAction}
+   */
+  static async #onAddDetectionMode() {
+    const formData = new FormDataExtended(this.form);
+    const modes = Object.values(this._processFormData(event, this.form, formData).detectionModes ?? {});
+    modes.push({ id: "", range: 0, enabled: true });
+    this._previewChanges({ detectionModes: modes });
+    await this.render({ parts: ["vision"], resetPreview: false });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Remove a detection mode from the Token preview.
+   * @this {PresetConfig}
+   * @type {ApplicationClickAction}
+   */
+  static async #onRemoveDetectionMode(_event, target) {
+    const formData = new FormDataExtended(this.form);
+    const modes = Object.values(this._processFormData(event, this.form, formData).detectionModes ?? {});
+    const index = Number(target.closest("[data-index]")?.dataset.index);
+    modes.splice(index, 1);
+    this._previewChanges({ detectionModes: modes });
+    await this.render({ parts: ["vision"], resetPreview: false });
+
+  }
+
+  /** @inheritDoc */
+  _processFormData(event, form, formData) {
+    //const submitData = super._processFormData(event, form, formData);
+    const submitData = foundry.utils.expandObject(formData.object);
+    submitData.detectionModes ??= []; // Clear detection modes array
+    this._processChanges(submitData);
+    return submitData;
+  }
+
+  /**
+ * Process several fields from form submission data into proper model changes.
+ * @param {object} submitData Form submission data passed through {@link foundry.applications.ux.FormDataExtended}
+ * @protected
+ */
+  _processChanges(submitData) {
+    // Convert scale and mirror data from the form submission to TextureData changes
+    // if (typeof submitData.scale === "number") {
+    //   submitData.texture.scaleX = submitData.scale * (submitData.mirrorX ? -1 : 1);
+    //   submitData.texture.scaleY = submitData.scale * (submitData.mirrorY ? -1 : 1);
+    // }
+    // for (const key of ["scale", "mirrorX", "mirrorY"]) delete submitData[key];
+
+    // // Process token ring effects from the form submission
+    // if (Array.isArray(submitData.ring?.effects)) {
+    //   const TRE = CONFIG.Token.ring.ringClass.effects;
+    //   let effects = submitData.ring.enabled ? TRE.ENABLED : TRE.DISABLED;
+    //   for (const effectName of submitData.ring.effects) {
+    //     const v = TRE[effectName] ?? 0;
+    //     effects |= v;
+    //   }
+    //   submitData.ring.effects = effects;
+    // }
+  }
+
 
   _clearProperty(object, key) {
     let target = object;
