@@ -179,6 +179,7 @@ class ATL {
             if (game.userId !== userId || !item.parent) return;
             if ((game.system.id === "dnd5e" && (hasProperty(change, "system.equipped") || hasProperty(change, "system.attunement")))
                 || (game.system.id === "wfrp4e" && hasProperty(change, "system.worn.value"))
+                || (game.system.id === "dragonbane" && hasProperty(change, "system.worn"))
                 || (game.system.id === "swade" && hasProperty(change, "system.equipStatus"))) {
                 let actor = item.parent
                 let ATLeffects = getEffects(actor)
@@ -279,31 +280,16 @@ class ATL {
     }
 
     static getSceneControlButtons(controls) {
-        if (game.release.generation >= 13) {
-            if (!game.user.isGM) return;
-            controls.lighting.tools.atlLights = {
-                name: "atlLights",
-                title: "ATL Presets",
-                icon: "fas fa-plus-circle",
-                onChange: (event, active) => ATL.UpdatePresets(),
-                button: true
-            };
-        }
-        else {
-            let tokenButton = controls.find(b => b.name == "lighting")
-            if (tokenButton) {
-                tokenButton.tools.push({
-                    name: "atl-lights",
-                    title: "ATL Presets",
-                    icon: "fas fa-plus-circle",
-                    visible: game.user.isGM,
-                    onClick: () => ATL.UpdatePresets(),
-                    button: true
-                });
-            }
-        }
+        controls.lighting.tools.atlLights = {
+            name: "atlLights",
+            title: "ATL Presets",
+            icon: "fas fa-plus-circle",
+            button: true,
+            visible: game.user.isGM,
+            onChange: () => ATL.UpdatePresets()
+        };
     }
-
+    
     static async applyEffects(entity, effects) {
         if (entity.documentName !== "Actor") return;
         const tokenArray = entity.getActiveTokens();

@@ -8,3 +8,5 @@ packs/*
 !packs/_source/
 !packs/*.db
 .DS_Store
+
+.idea/*
